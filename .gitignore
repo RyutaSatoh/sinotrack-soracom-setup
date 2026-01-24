@@ -1,0 +1,11 @@
+# Python related
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs
+*.log
+
+# Temp files
+*.tmp
+temp/
