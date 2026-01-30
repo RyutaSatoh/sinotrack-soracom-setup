@@ -1,37 +1,41 @@
 import serial
 import time
+import glob
+import sys
 
-def send_at(ser, cmd, wait=1):
+def find_at_port():
+    ports = glob.glob('/dev/ttyUSB*')
+    for port in ports:
+        try:
+            ser = serial.Serial(port, 115200, timeout=1)
+            ser.write(b"AT\r\n")
+            if b"OK" in ser.read(100): return port
+            ser.close()
+        except: pass
+    return None
+
+def send_at(ser, cmd):
     print(f"CMD: {cmd}")
     ser.write((cmd + "\r\n").encode())
-    time.sleep(wait)
+    time.sleep(1)
     resp = ser.read(ser.in_waiting).decode(errors='ignore')
     print(f"RES: {resp.strip()}")
     return resp
 
 try:
-    ser = serial.Serial('/dev/ttyUSB5', 115200, timeout=2)
-    ser.flushInput()
-    
-    print("=== Sinotrack Internal Status Report ===")
-    
-    # 1. Basic HW Check
-    send_at(ser, "AT+CPIN?")
-    send_at(ser, "AT+CSQ")
-    
-    # 2. Network Status
-    send_at(ser, "AT+CEREG?")
-    send_at(ser, "AT+COPS?")
-    
-    # 3. Connection Settings (Did they persist?)
-    # Scan Mode (Should be 3 for LTE Only)
-    send_at(ser, 'AT+QCFG="nwscanmode"')
-    # APN (Should be soracom.io)
-    send_at(ser, "AT+CGDCONT?")
-    
-    # 4. Error Detail (If registration failed)
-    send_at(ser, "AT+CEER")
-
+    port = find_at_port()
+    if not port:
+        print("No AT port found.")
+        sys.exit(1)
+        
+    ser = serial.Serial(port, 115200, timeout=2)
+    print("=== Power Saving Status Report ===")
+    send_at(ser, "ATE0")
+    send_at(ser, "AT+QSCLK?")  # Sleep control
+    send_at(ser, "AT+CPSMS?")  # PSM setting
+    send_at(ser, "AT+CEDRXS?") # eDRX setting
+    send_at(ser, "AT+QPSMEXT?") # Quectel PSM extended
+    send_at(ser, "AT+QPSMS?")   # Quectel PSM 
     ser.close()
     
 except Exception as e:
